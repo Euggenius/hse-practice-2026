@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -200,14 +200,15 @@ namespace GostEspdAddIn.Services
                     ManualMarkerRegex.Match(
                         rawText);
 
-                item.HasManualMarker =
-                    match.Success;
+                bool isRealManualMarker = match.Success && match.Length < rawText.TrimEnd().Length;
+
+                item.HasManualMarker = isRealManualMarker;
 
                 item.HasMarker =
                     item.HasManualMarker ||
                     item.IsWordList;
 
-                if (match.Success)
+                if (isRealManualMarker)
                 {
                     item.Content =
                         rawText.Substring(
@@ -552,7 +553,7 @@ namespace GostEspdAddIn.Services
                 ManualMarkerRegex.Match(
                     text);
 
-            if (oldMarker.Success)
+            if (oldMarker.Success && oldMarker.Length < text.TrimEnd().Length)
             {
                 Range markerRange =
                     paragraph.Range.Duplicate;
@@ -650,24 +651,26 @@ namespace GostEspdAddIn.Services
             if (text.Length <= markerLength)
                 return;
 
-            int end =
-                text.Length;
+            Match match =
+                Regex.Match(
+                    text,
+                    @"[\s\u00A0]*[.,;:!?…]+[\s\u00A0]*$");
 
-            while (end > markerLength &&
-                   char.IsWhiteSpace(
-                       text[end - 1]))
+            if (!match.Success)
             {
-                end--;
+                match =
+                    Regex.Match(
+                        text,
+                        @"[\s\u00A0]+$");
             }
 
-            while (end > markerLength &&
-                   IsEndingPunctuation(
-                       text[end - 1]))
-            {
-                end--;
-            }
+            if (!match.Success)
+                return;
 
-            if (end >= text.Length)
+            int start =
+                match.Index;
+
+            if (start < markerLength)
                 return;
 
             Range tail =
@@ -675,7 +678,7 @@ namespace GostEspdAddIn.Services
 
             tail.Start =
                 paragraph.Range.Start +
-                end;
+                start;
 
             tail.End =
                 paragraph.Range.Start +
@@ -691,13 +694,29 @@ namespace GostEspdAddIn.Services
             Range range =
                 paragraph.Range.Duplicate;
 
-            range.Start =
-                paragraph.Range.End - 1;
+            string text =
+                RemoveParagraphEnd(
+                    range.Text);
 
-            range.End =
-                range.Start;
+            int end = text.Length;
 
-            range.InsertBefore(
+            while (end > 0 &&
+                (char.IsWhiteSpace(text[end - 1]) ||
+                    text[end - 1] == '\u00A0'))
+            {
+                end--;
+            }
+
+            Range insert =
+                paragraph.Range.Duplicate;
+
+            insert.Start =
+                paragraph.Range.Start + end;
+
+            insert.End =
+                insert.Start;
+
+            insert.InsertBefore(
                 punctuation);
         }
 
